@@ -7,8 +7,14 @@
   },
   "main": "paxy.js",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node scripts/smoke.js"
+  },
   "dependencies": {
-    "commander": "^12.1.0",
-    "pngjs": "^7.0.0"
+    "commander": "12.1.0",
+    "pngjs": "7.0.0"
   }
 }
