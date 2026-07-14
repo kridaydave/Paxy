@@ -1,0 +1,1 @@
+- [2026-07-13] SPEC.html created — animated design + architecture spec for Paxy CLI, 34.8KB self-contained HTML

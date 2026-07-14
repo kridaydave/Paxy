@@ -1,0 +1,6 @@
+- [2026-07-13] Paxy CLI v1 built & verified end-to-end (create/template/pixel/line/rect/circle/fill/erase/batch/export png). Node CommonJS: bin/paxy.js → paxy.js (commander) + lib/{project,draw,templates,png}.js + commands/*.js. Deps: commander ^12, pngjs ^7.
+- [2026-07-13] .paxy format is DENSE grid (one-way door, GUI-compatible): {version,gridSize,currentFrame,activeLayer,frames:[[{name,opacity,visible,grid:size×size of null|hex}]]}, grid[y][x]. Mirrors index.html GUI model so .paxy opens in the existing GUI. Don't change to sparse.
+- [2026-07-13] pngjs: use PNG.sync.write(png) for synchronous export (returns Buffer) — no stream piping needed.
+- [2026-07-13] 12 templates ported verbatim from index.html TEMPLATES (lines 695-708). COLOR_MAP = Pico-8 palette[0..3]: #→#000000, O→#1d2b53, M→#7e2553, !→#008751.
+- [2026-07-13] Gotcha: batch --file JSON must be BOM-free UTF-8. PowerShell `echo >` and `[IO.File]::WriteAllText` add a BOM that breaks JSON.parse. Write via `fs.writeFileSync` (node) instead.
+- [2026-07-13] Upstream GitHub repo kridaydave/Paxy is an EMPTY placeholder (1 commit, only LICENSE, no code). It is the publish target, not a conflicting implementation — our local build is the codebase that goes there. No git initialized locally yet.

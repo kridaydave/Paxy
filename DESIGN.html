@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paxy CLI — Architecture Design Document</title>
+<style>
+  :root {
+    --ivory:    #FAF9F5;
+    --paper:    #FFFFFF;
+    --slate:    #141413;
+    --clay:     #D97757;
+    --clay-d:   #B85C3E;
+    --oat:      #E3DACC;
+    --olive:    #788C5D;
+    --cyan:     #0097A7;
+    --cyan-l:   #B2EBF2;
+    --g100:     #F0EEE6;
+    --g200:     #E6E3DA;
+    --g300:     #D1CFC5;
+    --g500:     #87867F;
+    --g700:     #3D3D3A;
+    --serif:    ui-serif, Georgia, 'Times New Roman', serif;
+    --sans:     system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono:     ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  }
+  html.dark {
+    --ivory:    #0F1114;
+    --paper:    #181B20;
+    --slate:    #E8E6E1;
+    --clay:     #E8845C;
+    --clay-d:   #F0A070;
+    --oat:      #2A2D33;
+    --olive:    #8FBF6A;
+    --cyan:     #4DD0E1;
+    --cyan-l:   #1A3A40;
+    --g100:     #1E2128;
+    --g200:     #262A31;
+    --g300:     #353A44;
+    --g500:     #7A7F8A;
+    --g700:     #C5C3BC;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+  body {
+    font-family: var(--sans);
+    background: var(--ivory);
+    color: var(--g700);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  .page { max-width: 100%; width: 1080px; margin: 0 auto; padding: 0 32px 160px; }
+
+  /* ── theme toggle ────────────────────── */
+  .theme-toggle {
+    position: fixed; bottom: 28px; right: 28px; z-index: 100;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--paper); border: 1.5px solid var(--g300);
+    cursor: pointer; display: grid; place-items: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    font-size: 18px; transition: all .2s;
+  }
+  .theme-toggle:hover { border-color: var(--clay); transform: scale(1.08); }
+  html.dark .theme-toggle { background: var(--g100); border-color: var(--g300); }
+
+  /* ── header ──────────────────────────── */
+  header { padding: 72px 0 48px; border-bottom: 1.5px solid var(--g300); margin-bottom: 12px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--g500); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .eyebrow::before { content: ''; width: 24px; height: 1.5px; background: var(--clay); }
+  h1 {
+    font-family: var(--serif); font-weight: 500;
+    font-size: clamp(36px, 5vw, 58px); line-height: 1.08;
+    letter-spacing: -0.02em; color: var(--slate); margin-bottom: 12px;
+  }
+  h1 em { font-style: italic; color: var(--clay); }
+  .subtitle { font-size: 16px; color: var(--g500); max-width: 560px; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--g500);
+  }
+  .meta-row .tag {
+    background: var(--g100); border: 1px solid var(--g300);
+    padding: 4px 12px; border-radius: 6px;
+  }
+  .meta-row .tag b { color: var(--slate); font-weight: 600; }
+
+  /* ── layout ──────────────────────────── */
+  .layout {
+    display: grid; grid-template-columns: 200px 1fr;
+    gap: 40px; align-items: start; margin-top: 48px;
+  }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .toc { display: none; }
+  }
+
+  /* ── toc ─────────────────────────────── */
+  .toc {
+    position: sticky; top: 32px;
+    border-left: 1.5px solid var(--g300); padding-left: 18px;
+    font-size: 13px;
+  }
+  .toc .t-head {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--g500); margin-bottom: 10px;
+  }
+  .toc a {
+    display: block; color: var(--g700); text-decoration: none;
+    padding: 3px 0; transition: color .15s;
+  }
+  .toc a:hover { color: var(--clay); }
+  .toc .sub { padding-left: 12px; color: var(--g500); font-size: 12px; }
+
+  /* ── sections ────────────────────────── */
+  section { margin-bottom: 56px; scroll-margin-top: 24px; max-width: 100%; overflow-wrap: break-word; }
+  main { min-width: 0; }
+  h2 {
+    font-family: var(--serif); font-weight: 500; font-size: 26px;
+    color: var(--slate); margin-bottom: 16px; letter-spacing: -0.01em;
+  }
+  h3 {
+    font-family: var(--sans); font-weight: 600; font-size: 15px;
+    color: var(--slate); margin: 28px 0 10px; letter-spacing: -0.005em;
+  }
+  p { font-size: 15px; max-width: 100%; margin-bottom: 12px; }
+  p.lede { font-size: 16px; color: var(--slate); }
+
+  /* ── tldr card ───────────────────────── */
+  .tldr {
+    background: var(--paper); border: 1.5px solid var(--g300);
+    border-left: 4px solid var(--clay); border-radius: 12px;
+    padding: 22px 26px; margin-bottom: 48px; max-width: 100%;
+  }
+  .tldr .k {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--g500); margin-bottom: 8px;
+  }
+  .tldr p { font-size: 15px; color: var(--slate); margin-bottom: 6px; }
+
+  /* ── code block ──────────────────────── */
+  pre {
+    background: var(--g100); border: 1px solid var(--g300);
+    border-radius: 10px; padding: 18px 22px; overflow-x: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.55;
+    color: var(--slate); margin: 14px 0 18px; max-width: 100%;
+  }
+  pre .cmt { color: var(--g500); }
+  pre .kw { color: var(--clay); }
+  pre .str { color: var(--olive); }
+  pre .fn { color: var(--cyan); }
+
+  code {
+    font-family: var(--mono); font-size: 13px;
+    background: var(--g100); padding: 2px 6px; border-radius: 4px;
+    color: var(--clay-d);
+  }
+  html.dark code { color: var(--clay); }
+
+  /* ── cards / panels ──────────────────── */
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px; margin: 16px 0 24px;
+  }
+  .card {
+    background: var(--paper); border: 1.5px solid var(--g300);
+    border-radius: 10px; padding: 18px 20px; transition: border-color .2s;
+  }
+  .card:hover { border-color: var(--clay); }
+  .card .card-label {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--g500); margin-bottom: 6px;
+  }
+  .card .card-title {
+    font-family: var(--sans); font-weight: 600; font-size: 14px;
+    color: var(--slate); margin-bottom: 4px;
+  }
+  .card .card-desc { font-size: 13px; color: var(--g500); line-height: 1.5; }
+
+  /* ── file tree ───────────────────────── */
+  .file-tree {
+    background: var(--paper); border: 1.5px solid var(--g300);
+    border-radius: 12px; padding: 20px 24px; margin: 16px 0 24px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    color: var(--slate); max-width: 520px;
+  }
+  .file-tree .dir { color: var(--cyan); font-weight: 600; }
+  .file-tree .file { color: var(--g700); }
+  .file-tree .desc { color: var(--g500); font-size: 12px; }
+
+  /* ── tables ──────────────────────────── */
+  .table-wrap { overflow-x: auto; margin: 14px 0 22px; max-width: 100%; }
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13.5px; background: var(--paper);
+    border: 1.5px solid var(--g300); border-radius: 10px;
+    overflow: hidden;
+  }
+  thead { background: var(--g100); }
+  th {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--g500); text-align: left;
+    padding: 10px 16px; border-bottom: 1.5px solid var(--g300);
+    font-weight: 600;
+  }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--g200); color: var(--g700); }
+  tr:last-child td { border-bottom: none; }
+  td code { font-size: 12px; white-space: nowrap; }
+
+  /* ── diagram boxes ───────────────────── */
+  .diagram {
+    background: var(--paper); border: 1.5px solid var(--g300);
+    border-radius: 12px; padding: 28px; margin: 16px 0 24px;
+    max-width: 100%; overflow-x: auto;
+  }
+  .diagram pre { background: transparent; border: none; padding: 0; margin: 0; }
+
+  /* ── command blocks ──────────────────── */
+  .cmd-group { margin: 16px 0 24px; }
+  .cmd-group-title {
+    font-family: var(--mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--clay); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cmd-group-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--g300);
+  }
+  .cmd {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0; border-bottom: 1px solid var(--g200);
+  }
+  .cmd:last-child { border-bottom: none; }
+  @media (max-width: 600px) { .cmd { grid-template-columns: 1fr; } }
+  .cmd code {
+    padding: 8px 0; font-size: 12.5px; background: transparent;
+    color: var(--slate); font-weight: 500;
+  }
+  .cmd span { font-size: 13px; color: var(--g500); padding: 8px 0; }
+
+  /* ── callout ─────────────────────────── */
+  .callout {
+    background: var(--cyan-l); border: 1.5px solid var(--cyan);
+    border-radius: 10px; padding: 16px 20px; margin: 14px 0 20px;
+    max-width: 100%;
+  }
+  .callout .callout-label {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--cyan); margin-bottom: 6px; font-weight: 700;
+  }
+  .callout p { font-size: 14px; color: var(--slate); margin-bottom: 4px; }
+
+  /* ── badge ───────────────────────────── */
+  .badge {
+    display: inline-block; font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.04em; padding: 3px 10px; border-radius: 6px;
+    font-weight: 600;
+  }
+  .badge.new { background: #E8F5E9; color: #2E7D32; }
+  .badge.ported { background: #FFF3E0; color: #E65100; }
+  html.dark .badge.new { background: #1B3A1B; color: #81C784; }
+  html.dark .badge.ported { background: #3E2723; color: #FFAB91; }
+
+  /* ── separator ───────────────────────── */
+  .sep {
+    border: none; border-top: 1.5px solid var(--g300);
+    margin: 48px 0; max-width: 100%;
+  }
+
+  /* ── list ────────────────────────────── */
+  ul.clean { list-style: none; padding: 0; }
+  ul.clean li {
+    padding: 6px 0; font-size: 14px; display: flex; align-items: baseline; gap: 10px;
+  }
+  ul.clean li::before {
+    content: '→'; color: var(--clay); font-weight: 700; flex-shrink: 0;
+  }
+
+  /* ── agent example ───────────────────── */
+  .agent-example {
+    background: var(--g100); border: 1.5px solid var(--g300);
+    border-radius: 12px; padding: 22px 26px; margin: 16px 0 24px;
+    max-width: 100%;
+  }
+  .agent-example .ex-title {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--olive); margin-bottom: 12px; font-weight: 700;
+  }
+  .agent-example pre { background: transparent; border: none; padding: 0; margin: 0; border-radius: 0; }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════════ HEADER ═══════════════════════════════════════ -->
+<header>
+  <div class="eyebrow">Architecture Design Document</div>
+  <h1><em>Paxy</em> CLI</h1>
+  <p class="subtitle">A command-line pixel art maker for AI agents — create, draw, layer, animate, and export pixel art from the terminal.</p>
+  <div class="meta-row">
+    <span class="tag"><b>v1.0</b> Design</span>
+    <span class="tag">Node.js + ESM</span>
+    <span class="tag">15 files</span>
+    <span class="tag">~1200 LOC</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════ TL;DR ═══════════════════════════════════════ -->
+<div class="tldr">
+  <div class="k">TL;DR</div>
+  <p><strong>Paxy</strong> is a single-file HTML pixel art editor (2321 lines). We're converting it into a <strong>Node.js CLI tool</strong> that AI agents call as a bash command. Agents create canvases, draw pixels/shapes, manage layers and frames, and export to PNG/GIF — all via <code>paxy &lt;subcommand&gt;</code> invocations.</p>
+  <p>State persists in <code>.paxy</code> JSON files. Every command loads → mutates → saves. No daemon, no REPL, no state between calls.</p>
+</div>
+
+<!-- ═══════════════════════════════════════ LAYOUT ═══════════════════════════════════════ -->
+<div class="layout">
+
+<!-- ── TOC ──────────────────────────────── -->
+<nav class="toc">
+  <div class="t-head">Contents</div>
+  <a href="#requirements">Requirements</a>
+  <a href="#constraints" class="sub">Constraints</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#file-structure" class="sub">File structure</a>
+  <a href="#data-flow" class="sub">Data flow</a>
+  <a href="#file-format">.paxy Format</a>
+  <a href="#commands">Commands</a>
+  <a href="#cmd-project" class="sub">Project</a>
+  <a href="#cmd-draw" class="sub">Draw</a>
+  <a href="#cmd-layers" class="sub">Layers</a>
+  <a href="#cmd-frames" class="sub">Frames</a>
+  <a href="#cmd-palette" class="sub">Palette</a>
+  <a href="#cmd-export" class="sub">Export</a>
+  <a href="#implementation">Implementation</a>
+  <a href="#algorithms" class="sub">Algorithms</a>
+  <a href="#agent-example">Agent Example</a>
+  <a href="#failure-modes">Failure Modes</a>
+</nav>
+
+<!-- ── MAIN ─────────────────────────────── -->
+<main>
+
+<!-- ════════════════ REQUIREMENTS ════════════════ -->
+<section id="requirements">
+  <h2>Requirements</h2>
+  <p class="lede">Functional capabilities the CLI must provide, derived from the original paxy editor's feature set — scoped for agent consumption.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Core</div>
+      <div class="card-title">Project Management</div>
+      <div class="card-desc">Create, load, save <code>.paxy</code> JSON files. Resize canvas. Inspect project metadata.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Drawing</div>
+      <div class="card-title">Pixel Operations</div>
+      <div class="card-desc">Set pixels, draw lines, rectangles, circles. Flood fill. Erase. Symmetry modes.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Structure</div>
+      <div class="card-title">Layers &amp; Frames</div>
+      <div class="card-desc">Per-frame layer stacks with opacity, visibility, merge, reorder. Frame duplication for animation.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Color</div>
+      <div class="card-title">Palette System</div>
+      <div class="card-desc">12 built-in palettes. Custom color import from <code>.hex</code> / <code>.gpl</code> files.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Output</div>
+      <div class="card-title">Export Formats</div>
+      <div class="card-desc">PNG (scaled), spritesheet PNG + JSON manifest, animated GIF with per-frame timing.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Extras</div>
+      <div class="card-title">Templates</div>
+      <div class="card-desc">12 built-in pixel art stencils (Heart, Sword, Tree, etc.) placed centered on canvas.</div>
+    </div>
+  </div>
+
+  <h3>Non-Functional</h3>
+  <ul class="clean">
+    <li>Zero-config: <code>npx paxy</code> or global install, no setup step</li>
+    <li>Agent-friendly: every command prints JSON on success, errors are structured</li>
+    <li>Stateless per invocation: each subcommand loads file → mutates → saves</li>
+    <li>Max canvas 64×64 (pixel art constraint, keeps files under 500KB)</li>
+  </ul>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ CONSTRAINTS ════════════════ -->
+<section id="constraints">
+  <h2>Constraints</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Runtime</div>
+      <div class="card-title">Node.js</div>
+      <div class="card-desc">User's choice. ESM modules, <code>"type": "module"</code> in package.json.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Interface</div>
+      <div class="card-title">Pure Subcommands</div>
+      <div class="card-desc">No REPL, no interactive mode. Every operation is a single CLI invocation.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Packaging</div>
+      <div class="card-title">Single npm Package</div>
+      <div class="card-desc">Publishable to npm. <code>bin</code> entry point exposes <code>paxy</code> command.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ ARCHITECTURE ════════════════ -->
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p class="lede">A flat, module-per-concern structure. CLI parsing at the top, shared library modules in the middle, command handlers at the bottom.</p>
+
+  <h3 id="file-structure">File Structure</h3>
+  <div class="file-tree">
+    <div><span class="dir">paxy-cli/</span></div>
+    <div>&ensp;├── <span class="file">package.json</span> <span class="desc">— name, bin, deps</span></div>
+    <div>&ensp;├── <span class="dir">bin/</span></div>
+    <div>&ensp;│&ensp;└── <span class="file">paxy.js</span> <span class="desc">— entry point, commander setup</span></div>
+    <div>&ensp;├── <span class="dir">lib/</span></div>
+    <div>&ensp;│&ensp;├── <span class="file">project.js</span> <span class="desc">— load / save / create .paxy</span></div>
+    <div>&ensp;│&ensp;├── <span class="file">drawing.js</span> <span class="desc">— pixel, line, rect, circle, fill</span></div>
+    <div>&ensp;│&ensp;├── <span class="file">palette.js</span> <span class="desc">— 12 palettes, import parsers</span></div>
+    <div>&ensp;│&ensp;├── <span class="file">templates.js</span> <span class="desc">— 12 template definitions</span></div>
+    <div>&ensp;│&ensp;└── <span class="file">export.js</span> <span class="desc">— PNG, spritesheet, GIF rendering</span></div>
+    <div>&ensp;└── <span class="dir">commands/</span></div>
+    <div>&ensp;&ensp;&ensp;├── <span class="file">project.js</span> <span class="desc">— create, info, resize</span></div>
+    <div>&ensp;&ensp;&ensp;├── <span class="file">draw.js</span> <span class="desc">— pixel, line, rect, circle, fill, erase, symmetry, template</span></div>
+    <div>&ensp;&ensp;&ensp;├── <span class="file">layers.js</span> <span class="desc">— add, remove, rename, list, active, opacity, visible, merge, move</span></div>
+    <div>&ensp;&ensp;&ensp;├── <span class="file">frames.js</span> <span class="desc">— add, duplicate, remove, list, active, move, duration</span></div>
+    <div>&ensp;&ensp;&ensp;├── <span class="file">palette.js</span> <span class="desc">— list, set, add-color, import</span></div>
+    <div>&ensp;&ensp;&ensp;└── <span class="file">export.js</span> <span class="desc">— png, spritesheet, gif</span></div>
+  </div>
+
+  <h3 id="data-flow">Data Flow</h3>
+  <div class="diagram">
+    <pre>
+  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+  │   CLI args   │ ───► │  commander   │ ───► │   command    │
+  │  (subcommand │      │   parses     │      │   handler    │
+  │   + options) │      │              │      │              │
+  └──────────────┘      └──────────────┘      └──────┬───────┘
+                                                     │
+                                              ┌──────▼───────┐
+                                              │ lib/project  │
+                                              │ loadProject()│
+                                              └──────┬───────┘
+                                                     │
+                                              ┌──────▼───────┐
+                                              │  mutate the  │
+                                              │  project obj │
+                                              └──────┬───────┘
+                                                     │
+                                              ┌──────▼───────┐
+                                              │ lib/project  │
+                                              │saveProject() │
+                                              └──────┬───────┘
+                                                     │
+                                              ┌──────▼───────┐
+                                              │  stdout JSON │
+                                              │  confirmation│
+                                              └──────────────┘</pre>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ .PAXY FORMAT ════════════════ -->
+<section id="file-format">
+  <h2>.paxy File Format</h2>
+  <p class="lede">A JSON-based project format using <strong>sparse pixel arrays</strong> — only pixels that have been drawn are stored, not entire grids.</p>
+
+  <div class="callout">
+    <div class="callout-label">Design Choice</div>
+    <p>A 32×32 layer with 10 drawn pixels stores <strong>10 entries</strong>, not 1024. Agents map directly: <code>paxy pixel --x 5 --y 3 --color #ff004d</code> → one JSON object in the array.</p>
+  </div>
+
+  <pre>{
+  <span class="str">"version"</span>: 1,
+  <span class="str">"canvas"</span>: { <span class="str">"width"</span>: 32, <span class="str">"height"</span>: 32 },
+  <span class="str">"palette"</span>: [<span class="str">"#000000"</span>, <span class="str">"#1d2b53"</span>, <span class="str">"#7e2553"</span>, ...],
+  <span class="str">"activeFrame"</span>: 0,
+  <span class="str">"activeLayer"</span>: 0,
+  <span class="str">"frames"</span>: [
+    {
+      <span class="str">"duration"</span>: 200,
+      <span class="str">"layers"</span>: [
+        {
+          <span class="str">"name"</span>: <span class="str">"Layer 1"</span>,
+          <span class="str">"visible"</span>: <span class="kw">true</span>,
+          <span class="str">"opacity"</span>: 1.0,
+          <span class="str">"pixels"</span>: [
+            { <span class="str">"x"</span>: 5, <span class="str">"y"</span>: 3, <span class="str">"color"</span>: <span class="str">"#ff004d"</span> },
+            { <span class="str">"x"</span>: 6, <span class="str">"y"</span>: 3, <span class="str">"color"</span>: <span class="str">"#ff004d"</span> }
+          ]
+        }
+      ]
+    }
+  ]
+}</pre>
+
+  <p>Transparent pixels are simply <strong>absent</strong> from the array. Rendering composites visible layers bottom-to-top — last pixel at any (x,y) wins.</p>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ COMMANDS ════════════════ -->
+<section id="commands">
+  <h2>Command Reference</h2>
+  <p class="lede">Every command accepts <code>--project &lt;path&gt;</code> (defaults to <code>./untitled.paxy</code>). All commands print JSON on success.</p>
+
+  <!-- Project -->
+  <div id="cmd-project" class="cmd-group">
+    <div class="cmd-group-title">Project</div>
+    <div class="cmd"><code>paxy create --size 32x32 --output art.paxy</code><span>Create empty project</span></div>
+    <div class="cmd"><code>paxy info --project art.paxy</code><span>Print canvas size, frame count, layer counts</span></div>
+    <div class="cmd"><code>paxy resize --size 48x48 --project art.paxy</code><span>Resize canvas (preserves pixels)</span></div>
+  </div>
+
+  <!-- Draw -->
+  <div id="cmd-draw" class="cmd-group">
+    <div class="cmd-group-title">Draw</div>
+    <div class="cmd"><code>paxy pixel --x 5 --y 3 --color #ff004d --project art.paxy</code><span>Set one pixel</span></div>
+    <div class="cmd"><code>paxy line --x1 0 --y1 0 --x2 10 --y2 10 --color #ff004d --project art.paxy</code><span>Bresenham line</span></div>
+    <div class="cmd"><code>paxy rect --x1 2 --y1 2 --x2 8 --y2 8 --color #ff004d --filled --project art.paxy</code><span>Rectangle (outline or filled)</span></div>
+    <div class="cmd"><code>paxy circle --cx 16 --cy 16 --r 5 --color #ff004d --filled --project art.paxy</code><span>Circle (midpoint algorithm)</span></div>
+    <div class="cmd"><code>paxy fill --x 5 --y 5 --color #ff004d --project art.paxy</code><span>Flood fill</span></div>
+    <div class="cmd"><code>paxy erase --x 5 --y 3 --project art.paxy</code><span>Erase pixel</span></div>
+    <div class="cmd"><code>paxy symmetry --mode h --project art.paxy</code><span>Set symmetry (off / h / v / hv)</span></div>
+    <div class="cmd"><code>paxy template --name Heart --project art.paxy</code><span>Place template centered</span></div>
+  </div>
+
+  <!-- Layers -->
+  <div id="cmd-layers" class="cmd-group">
+    <div class="cmd-group-title">Layers</div>
+    <div class="cmd"><code>paxy layer add --name "BG" --project art.paxy</code><span>Add new layer</span></div>
+    <div class="cmd"><code>paxy layer remove --name "BG" --project art.paxy</code><span>Remove layer (min 1)</span></div>
+    <div class="cmd"><code>paxy layer rename --from "Layer 1" --to "BG" --project art.paxy</code><span>Rename layer</span></div>
+    <div class="cmd"><code>paxy layer list --project art.paxy</code><span>List all layers with opacity/visibility</span></div>
+    <div class="cmd"><code>paxy layer active --name "BG" --project art.paxy</code><span>Set active layer</span></div>
+    <div class="cmd"><code>paxy layer opacity --value 0.5 --project art.paxy</code><span>Set active layer opacity</span></div>
+    <div class="cmd"><code>paxy layer visible --name "BG" --show false --project art.paxy</code><span>Toggle visibility</span></div>
+    <div class="cmd"><code>paxy layer merge --project art.paxy</code><span>Merge active layer down</span></div>
+    <div class="cmd"><code>paxy layer move --direction up --project art.paxy</code><span>Reorder layer</span></div>
+  </div>
+
+  <!-- Frames -->
+  <div id="cmd-frames" class="cmd-group">
+    <div class="cmd-group-title">Frames</div>
+    <div class="cmd"><code>paxy frame add --project art.paxy</code><span>Add empty frame after current</span></div>
+    <div class="cmd"><code>paxy frame duplicate --project art.paxy</code><span>Deep-clone current frame</span></div>
+    <div class="cmd"><code>paxy frame remove --project art.paxy</code><span>Delete frame (min 1)</span></div>
+    <div class="cmd"><code>paxy frame list --project art.paxy</code><span>List frames with duration &amp; layer count</span></div>
+    <div class="cmd"><code>paxy frame active --index 2 --project art.paxy</code><span>Set active frame</span></div>
+    <div class="cmd"><code>paxy frame move --direction left --project art.paxy</code><span>Reorder frame</span></div>
+    <div class="cmd"><code>paxy frame duration --ms 300 --project art.paxy</code><span>Set frame duration (ms)</span></div>
+  </div>
+
+  <!-- Palette -->
+  <div id="cmd-palette" class="cmd-group">
+    <div class="cmd-group-title">Palette</div>
+    <div class="cmd"><code>paxy palette list</code><span>List all built-in palettes</span></div>
+    <div class="cmd"><code>paxy palette set --name "Pico-8" --project art.paxy</code><span>Switch project palette</span></div>
+    <div class="cmd"><code>paxy palette add-color --hex #ff004d --project art.paxy</code><span>Append color to palette</span></div>
+    <div class="cmd"><code>paxy palette import --file custom.hex --project art.paxy</code><span>Import from .hex / .gpl file</span></div>
+  </div>
+
+  <!-- Export -->
+  <div id="cmd-export" class="cmd-group">
+    <div class="cmd-group-title">Export</div>
+    <div class="cmd"><code>paxy export png --scale 4 --output frame.png --project art.paxy</code><span>Export current frame as PNG</span></div>
+    <div class="cmd"><code>paxy export spritesheet --cols 4 --output sheet.png --project art.paxy</code><span>Spritesheet PNG + JSON manifest</span></div>
+    <div class="cmd"><code>paxy export gif --output anim.gif --project art.paxy</code><span>Animated GIF (all frames)</span></div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ IMPLEMENTATION ════════════════ -->
+<section id="implementation">
+  <h2>Implementation Plan</h2>
+  <p class="lede">File-by-file breakdown of what each module does and which original algorithms are ported.</p>
+
+  <h3 id="algorithms">Ported Algorithms</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Algorithm</th><th>Source (original)</th><th>Target</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Bresenham line</td><td><code>index.html:1014-1027</code></td><td><code>lib/drawing.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>Rectangle points</td><td><code>index.html:1029-1040</code></td><td><code>lib/drawing.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>Midpoint circle</td><td><code>index.html:1042-1063</code></td><td><code>lib/drawing.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>Flood fill (stack)</td><td><code>index.html:1392-1408</code></td><td><code>lib/drawing.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>Bayer 4×4 dither</td><td><code>index.html:671-676</code></td><td><code>lib/drawing.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>12 palettes</td><td><code>index.html:678-691</code></td><td><code>lib/palette.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>12 templates</td><td><code>index.html:695-708</code></td><td><code>lib/templates.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>Hex/GPL palette import</td><td><code>index.html:1919-1956</code></td><td><code>lib/palette.js</code></td><td><span class="badge ported">Port</span></td></tr>
+        <tr><td>Sparse pixel data model</td><td>—</td><td><code>lib/project.js</code></td><td><span class="badge new">New</span></td></tr>
+        <tr><td>Sharp-based PNG export</td><td>—</td><td><code>lib/export.js</code></td><td><span class="badge new">New</span></td></tr>
+        <tr><td>GIF encoder (gifencoder)</td><td>—</td><td><code>lib/export.js</code></td><td><span class="badge new">New</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Dependencies</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Purpose</th><th>Size</th></tr></thead>
+      <tbody>
+        <tr><td><code>commander</code></td><td>CLI argument parsing, subcommand routing</td><td>62 KB</td></tr>
+        <tr><td><code>sharp</code></td><td>PNG encoding, image composition, resize</td><td>~7 MB native</td></tr>
+        <tr><td><code>gifencoder</code></td><td>Animated GIF encoding</td><td>48 KB</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ AGENT EXAMPLE ════════════════ -->
+<section id="agent-example">
+  <h2>Agent Usage Example</h2>
+  <p class="lede">A typical workflow an AI agent would execute — creating a character, adding layers, and exporting.</p>
+
+  <div class="agent-example">
+    <div class="ex-title">Agent Workflow</div>
+    <pre><span class="cmt"># Create a 32×32 canvas</span>
+<span class="fn">paxy</span> create --size 32x32 --output hero.paxy
+
+<span class="cmt"># Draw a character body</span>
+<span class="fn">paxy</span> pixel --x 15 --y 10 --color <span class="str">#ff004d</span> --project hero.paxy
+<span class="fn">paxy</span> pixel --x 16 --y 10 --color <span class="str">#ff004d</span> --project hero.paxy
+<span class="fn">paxy</span> line --x1 15 --y1 11 --x2 15 --y2 18 --color <span class="str">#7e2553</span> --project hero.paxy
+<span class="fn">paxy</span> line --x1 16 --y1 11 --x2 16 --y2 18 --color <span class="str">#7e2553</span> --project hero.paxy
+<span class="fn">paxy</span> circle --cx 15 --cy 8 --r 2 --color <span class="str">#ffa300</span> --filled --project hero.paxy
+
+<span class="cmt"># Add a background layer</span>
+<span class="fn">paxy</span> layer add --name "BG" --project hero.paxy
+<span class="fn">paxy</span> layer active --name "BG" --project hero.paxy
+<span class="fn">paxy</span> fill --x 0 --y 0 --color <span class="str">#1d2b53</span> --project hero.paxy
+
+<span class="cmt"># Export for review</span>
+<span class="fn">paxy</span> export png --scale 4 --output hero.png --project hero.paxy
+<span class="fn">paxy</span> export gif --output hero-walk.gif --project hero.paxy</pre>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ FAILURE MODES ════════════════ -->
+<section id="failure-modes">
+  <h2>Failure Modes</h2>
+  <p class="lede">What can go wrong and how each case is handled.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Failure</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>Missing project file</td><td>Clear error: <code>"File not found: art.paxy. Use paxy create first."</code></td></tr>
+        <tr><td>Drawing out of bounds</td><td>Clamp to canvas bounds, warn on stderr</td></tr>
+        <tr><td>Layer index out of range</td><td>Error with valid range hint</td></tr>
+        <tr><td>GIF export with 1 frame</td><td>Error: <code>"Need 2+ frames for GIF"</code></td></tr>
+        <tr><td>Corrupt .paxy JSON</td><td>Validate on load, clear parse error message</td></tr>
+        <tr><td>Unknown palette name</td><td>List available palettes in error output</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ════════════════ REVISIT IF ════════════════ -->
+<section>
+  <h2>Revisit If</h2>
+  <ul class="clean">
+    <li>Canvas sizes &gt;64×64 become needed (sparse format handles it, but export slows)</li>
+    <li>Agents need batch operations (e.g. draw 100 pixels in one call → add <code>paxy batch --file steps.json</code>)</li>
+    <li>Real-time collaboration or merge conflicts matter (out of scope for CLI)</li>
+  </ul>
+</section>
+
+</main>
+</div><!-- /layout -->
+</div><!-- /page -->
+
+<!-- ═══════════════════════════════════ SCRIPT ═══════════════════════════════════ -->
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.classList.toggle('dark');
+    localStorage.setItem('paxy-theme', html.classList.contains('dark') ? 'dark' : 'light');
+  }
+  (function() {
+    const saved = localStorage.getItem('paxy-theme');
+    if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    }
+  })();
+</script>
+
+</body>
+</html>

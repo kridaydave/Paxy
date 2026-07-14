@@ -1,0 +1,14 @@
+{
+  "name": "paxy",
+  "version": "0.1.0",
+  "description": "A command-line pixel art maker for AI agents",
+  "bin": {
+    "paxy": "bin/paxy.js"
+  },
+  "main": "paxy.js",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "pngjs": "^7.0.0"
+  }
+}

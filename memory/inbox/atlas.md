@@ -1,0 +1,1 @@
+- [2026-07-13] from atlas: Architecture spec complete. See atlas architecture response below.

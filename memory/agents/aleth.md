@@ -1,0 +1,1 @@
+- [2026-07-13] Paxy CLI is past design phase (Charter PRD + Atlas architecture + Lumen SPEC/DESIGN html all done, no code yet). Next phase is implementation. Route: Forge (build per Atlas) → Anchor (pin deps + deterministic smoke test) → Forge verify kill condition (<30s agent sprite gen, from Charter). Stop early if kill condition fails.

@@ -1,0 +1,5 @@
+- [2026-07-13] Paxy CLI is for AI agents (like opencode) to generate pixel art — humans review the PNG and can open .paxy in GUI to polish
+- [2026-07-13] MVP scope: templates + pixel-by-pixel + bulk pixels + batch shapes + PNG export only. No GIF, no layers, no animation in v1
+- [2026-07-13] All 12 templates in v1. `paxy batch` accepts both inline JSON and file
+- [2026-07-13] Solo dev + AI tools. Keep deps minimal. .paxy must stay GUI-compatible
+- [2026-07-13] Kill condition: if AI can't generate recognizable sprite via CLI in <30s of tool calls, the tool failed

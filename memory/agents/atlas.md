@@ -1,0 +1,4 @@
+- [2026-07-13] Paxy CLI architecture — dense grid format chosen for GUI compatibility (one-way door, locked in)
+- [2026-07-13] pngjs (pure JS) chosen over sharp for PNG export — zero native deps, fast enough for 64x64 grids
+- [2026-07-13] Flat module structure: bin/ + lib/ + commands/. No deep nesting, solo dev
+- [2026-07-13] Batch ops use JSON array of typed operations: pixel, line, rect, circle, fill
